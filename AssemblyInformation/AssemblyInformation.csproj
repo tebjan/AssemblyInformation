@@ -151,7 +151,7 @@
     <Content Include="help.ico" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="app.config" />
+    <Content Include="app.config" />
     <None Include="AssemblyInformation.ruleset" />
     <None Include="packages.config" />
     <None Include="Settings.StyleCop" />
