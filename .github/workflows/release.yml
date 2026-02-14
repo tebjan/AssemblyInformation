@@ -47,5 +47,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          body: |
+            **[Download AssemblyInformation-${{ github.ref_name }}-win-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AssemblyInformation-${{ github.ref_name }}-win-x64.zip)**
+
+            **Requires:** [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) or newer
+
+            ### Installation
+            1. Download and extract the zip
+            2. Run `install.cmd` as Administrator
+            3. Right-click any .dll or .exe in Explorer → "Assembly Information"
+
+            To uninstall, run `uninstall.cmd` as Administrator.
           files: |
             AssemblyInformation-${{ github.ref_name }}-win-x64.zip
