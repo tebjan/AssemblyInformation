@@ -24,10 +24,24 @@ namespace AssemblyInformation
 
         private List<Binary> directDependencies;
 
+        private Label dropHintLabel;
+
         public FormMain(string assemblyPath)
         {
             InitializeComponent();
             FormClosing += FormMainFormClosing;
+
+            dropHintLabel = new Label
+            {
+                Text = "Drop a .dll or .exe here\nor use Options \u2192 Open Assembly (Ctrl+O)",
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = SystemColors.GrayText,
+                Font = new Font(Font.FontFamily, 14f),
+                AutoSize = false
+            };
+            Controls.Add(dropHintLabel);
+
             if (assemblyPath != null)
                 LoadAssembly(assemblyPath);
         }
@@ -49,6 +63,7 @@ namespace AssemblyInformation
             AssemblyFormMap[assemblyPath] = this;
             Text = $"Assembly Information - {Path.GetFileName(assemblyPath)}";
             panel1.Visible = true;
+            dropHintLabel.Visible = false;
 
             // Re-run the load logic
             FormMainLoad(this, EventArgs.Empty);
@@ -60,6 +75,7 @@ namespace AssemblyInformation
             if (assemblyInformation == null)
             {
                 panel1.Visible = false;
+                dropHintLabel.Visible = true;
                 Text = "Assembly Information";
                 return;
             }
