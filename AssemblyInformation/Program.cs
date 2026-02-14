@@ -10,33 +10,30 @@ namespace AssemblyInformation
         [STAThread]
         public static void Main(string[] args)
         {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
             Application.ThreadException += ApplicationThreadException;
+
+            string assemblyFullPath = null;
 
             if (args.Length == 1)
             {
-                string filePath = args[0];
-                string assemblyFullPath = Path.GetFullPath(filePath);
+                assemblyFullPath = Path.GetFullPath(args[0]);
 
                 if (!File.Exists(assemblyFullPath))
                 {
                     MessageBox.Show(string.Format(Resource.FailedToLocateFile, assemblyFullPath), Resource.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
-
-                try
-                {
-                    Application.EnableVisualStyles();
-                    Application.SetCompatibleTextRenderingDefault(false);
-                    Application.Run(new FormMain(assemblyFullPath));
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(string.Format(Resource.LoadError, ex.Message), Resource.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
             }
-            else
+
+            try
             {
-                MessageBox.Show(Resource.UsageString, Resource.AppName, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Application.Run(new FormMain(assemblyFullPath));
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format(Resource.LoadError, ex.Message), Resource.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

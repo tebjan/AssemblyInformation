@@ -61,6 +61,8 @@
             this.viewToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.hideGACAssembliesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.showAssemblyFullNameToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.openAssemblyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
             this.DebuggableFlagsToolTip = new System.Windows.Forms.ToolTip(this.components);
             this.label4 = new System.Windows.Forms.Label();
             this.frameWorkVersion = new System.Windows.Forms.TextBox();
@@ -368,6 +370,8 @@
             // aboutToolStripMenuItem
             // 
             this.aboutToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.openAssemblyToolStripMenuItem,
+            this.toolStripSeparator1,
             this.aboutToolStripMenuItem1,
             this.exitToolStripMenuItem});
             this.aboutToolStripMenuItem.Name = "aboutToolStripMenuItem";
@@ -380,11 +384,24 @@
             this.aboutToolStripMenuItem1.Size = new System.Drawing.Size(103, 22);
             this.aboutToolStripMenuItem1.Text = "About";
             this.aboutToolStripMenuItem1.Click += new System.EventHandler(this.AboutToolStripMenuItem1Click);
-            // 
+            //
+            // openAssemblyToolStripMenuItem
+            //
+            this.openAssemblyToolStripMenuItem.Name = "openAssemblyToolStripMenuItem";
+            this.openAssemblyToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.O)));
+            this.openAssemblyToolStripMenuItem.Size = new System.Drawing.Size(203, 22);
+            this.openAssemblyToolStripMenuItem.Text = "Open Assembly...";
+            this.openAssemblyToolStripMenuItem.Click += new System.EventHandler(this.OpenAssemblyToolStripMenuItem_Click);
+            //
+            // toolStripSeparator1
+            //
+            this.toolStripSeparator1.Name = "toolStripSeparator1";
+            this.toolStripSeparator1.Size = new System.Drawing.Size(200, 6);
+            //
             // exitToolStripMenuItem
-            // 
+            //
             this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
-            this.exitToolStripMenuItem.Size = new System.Drawing.Size(103, 22);
+            this.exitToolStripMenuItem.Size = new System.Drawing.Size(203, 22);
             this.exitToolStripMenuItem.Text = "Exit";
             this.exitToolStripMenuItem.Click += new System.EventHandler(this.ExitToolStripMenuItemClick);
             // 
@@ -441,12 +458,15 @@
             this.ClientSize = new System.Drawing.Size(816, 408);
             this.Controls.Add(this.menuStrip1);
             this.Controls.Add(this.panel1);
+            this.AllowDrop = true;
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MainMenuStrip = this.menuStrip1;
             this.MinimumSize = new System.Drawing.Size(154, 110);
             this.Name = "FormMain";
             this.Text = "Assembly Information";
             this.Load += new System.EventHandler(this.FormMainLoad);
+            this.DragEnter += new System.Windows.Forms.DragEventHandler(this.FormMain_DragEnter);
+            this.DragDrop += new System.Windows.Forms.DragEventHandler(this.FormMain_DragDrop);
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
             this.tabControl1.ResumeLayout(false);
@@ -497,5 +517,7 @@
         private System.Windows.Forms.ToolStripMenuItem showAssemblyFullNameToolStripMenuItem;
         private System.Windows.Forms.Label label4;
         private System.Windows.Forms.TextBox frameWorkVersion;
+        private System.Windows.Forms.ToolStripMenuItem openAssemblyToolStripMenuItem;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
     }
 }

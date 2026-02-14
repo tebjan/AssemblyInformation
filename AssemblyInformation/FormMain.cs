@@ -14,11 +14,11 @@ namespace AssemblyInformation
     {
         private const string Loading = "Loading";
 
-        private readonly string _assemblyPath;
+        private string _assemblyPath;
 
         private static readonly Dictionary<string, Form> AssemblyFormMap = new Dictionary<string, Form>();
 
-        private readonly AssemblyInformationLoader assemblyInformation;
+        private AssemblyInformationLoader assemblyInformation;
 
         private List<Binary> recursiveDependencies;
 
@@ -27,15 +27,43 @@ namespace AssemblyInformation
         public FormMain(string assemblyPath)
         {
             InitializeComponent();
+            FormClosing += FormMainFormClosing;
+            if (assemblyPath != null)
+                LoadAssembly(assemblyPath);
+        }
+
+        private void LoadAssembly(string assemblyPath)
+        {
+            // Clean up previous state
+            if (_assemblyPath != null)
+                AssemblyFormMap.Remove(_assemblyPath);
+            directDependencies = null;
+            recursiveDependencies = null;
+            dependencyTreeView.Nodes.Clear();
+            referenceListListBox.Items.Clear();
+            referringAssembliesListtBox.Items.Clear();
+
             _assemblyPath = assemblyPath;
             assemblyInformation = new AssemblyInformationLoader(assemblyPath);
             referringAssemblyFolderTextBox.Text = Path.GetDirectoryName(assemblyPath);
             AssemblyFormMap[assemblyPath] = this;
-            FormClosing += FormMainFormClosing;
+            Text = $"Assembly Information - {Path.GetFileName(assemblyPath)}";
+            panel1.Visible = true;
+
+            // Re-run the load logic
+            FormMainLoad(this, EventArgs.Empty);
         }
 
         private void FormMainLoad(object sender, EventArgs e)
         {
+            // If no assembly loaded, show empty state
+            if (assemblyInformation == null)
+            {
+                panel1.Visible = false;
+                Text = "Assembly Information";
+                return;
+            }
+
             string debuggableFlagsToolTipText;
 
             // Prevent read-only display fields from receiving focus
@@ -144,7 +172,8 @@ namespace AssemblyInformation
 
         private void FormMainFormClosing(object sender, FormClosingEventArgs e)
         {
-            AssemblyFormMap.Remove(_assemblyPath);
+            if (_assemblyPath != null)
+                AssemblyFormMap.Remove(_assemblyPath);
         }
 
         private void FillAssemblyReferences(IEnumerable<Binary> dependencies, TreeNode treeNode = null)
@@ -279,7 +308,7 @@ namespace AssemblyInformation
 
         private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (!assemblyInformation.IsManaged) return;
+            if (assemblyInformation == null || !assemblyInformation.IsManaged) return;
 
             if (tabControl1.SelectedIndex == 1 && referenceListListBox.Items.Count == 0)
             {
@@ -410,6 +439,48 @@ namespace AssemblyInformation
                 FillAssemblyReferences(directDependencies);
             if (recursiveDependencies != null)
                 FillRecursiveDependency();
+        }
+
+        private void OpenAssemblyToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Title = "Open Assembly",
+                Filter = "Assemblies (*.dll;*.exe)|*.dll;*.exe|All files (*.*)|*.*",
+                FilterIndex = 1
+            };
+            if (_assemblyPath != null)
+                dlg.InitialDirectory = Path.GetDirectoryName(_assemblyPath);
+            if (dlg.ShowDialog() == DialogResult.OK)
+                LoadAssembly(dlg.FileName);
+        }
+
+        private void FormMain_DragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files.Length == 1)
+                {
+                    var ext = Path.GetExtension(files[0]).ToLowerInvariant();
+                    if (ext == ".dll" || ext == ".exe")
+                    {
+                        e.Effect = DragDropEffects.Copy;
+                        return;
+                    }
+                }
+            }
+            e.Effect = DragDropEffects.None;
+        }
+
+        private void FormMain_DragDrop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                var files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files.Length == 1)
+                    LoadAssembly(files[0]);
+            }
         }
     }
 
