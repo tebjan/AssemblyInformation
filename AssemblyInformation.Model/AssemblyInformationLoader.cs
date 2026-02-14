@@ -73,6 +73,11 @@ namespace AssemblyInformation.Model
         /// </summary>
         public string ApphostManagedDll { get; private set; }
 
+        /// <summary>
+        /// Win32 version resource information (available for all PE files).
+        /// </summary>
+        public FileVersionInfo VersionInfo { get; private set; }
+
         public AssemblyName[] GetReferencedAssemblies()
         {
             if (!IsManaged) return Array.Empty<AssemblyName>();
@@ -85,18 +90,42 @@ namespace AssemblyInformation.Model
 
         private void LoadInformation()
         {
+            // Read Win32 version resources (available for all PE files)
+            try { VersionInfo = FileVersionInfo.GetVersionInfo(FilePath); } catch { }
+
             DetermineExecutableKind();
             if (IsManaged)
             {
                 DetermineMetadata();
             }
-            else if (AssemblyFullName == null)
+            else
             {
-                // Only set defaults if DetermineExecutableKind didn't already set them
-                // (e.g. single-file bundle sets its own values)
-                AssemblyFullName = Path.GetFileName(FilePath);
-                FrameworkVersion = "N/A (native)";
+                // For native files, build a rich display name from version resources
+                AssemblyFullName = BuildNativeDisplayName();
+                FrameworkVersion ??= "N/A (native)";
             }
+        }
+
+        private string BuildNativeDisplayName()
+        {
+            if (VersionInfo == null)
+                return Path.GetFileName(FilePath);
+
+            var parts = new List<string>();
+
+            if (!string.IsNullOrEmpty(VersionInfo.FileDescription))
+                parts.Add(VersionInfo.FileDescription);
+            else
+                parts.Add(Path.GetFileName(FilePath));
+
+            if (!string.IsNullOrEmpty(VersionInfo.FileVersion))
+                parts.Add($"Version: {VersionInfo.FileVersion}");
+            if (!string.IsNullOrEmpty(VersionInfo.CompanyName))
+                parts.Add(VersionInfo.CompanyName);
+            if (!string.IsNullOrEmpty(VersionInfo.LegalCopyright))
+                parts.Add(VersionInfo.LegalCopyright);
+
+            return parts.Count > 0 ? string.Join("\r\n", parts) : Path.GetFileName(FilePath);
         }
 
         private void DetermineExecutableKind()

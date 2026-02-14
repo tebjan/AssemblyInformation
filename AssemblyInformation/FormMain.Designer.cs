@@ -66,11 +66,16 @@
             this.DebuggableFlagsToolTip = new System.Windows.Forms.ToolTip(this.components);
             this.label4 = new System.Windows.Forms.Label();
             this.frameWorkVersion = new System.Windows.Forms.TextBox();
+            this.tabPage4 = new System.Windows.Forms.TabPage();
+            this.versionInfoListView = new System.Windows.Forms.ListView();
+            this.columnHeaderProperty = new System.Windows.Forms.ColumnHeader();
+            this.columnHeaderValue = new System.Windows.Forms.ColumnHeader();
             this.panel1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.tabPage2.SuspendLayout();
             this.tabPage3.SuspendLayout();
+            this.tabPage4.SuspendLayout();
             this.menuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -129,6 +134,7 @@
             this.tabControl1.Controls.Add(this.tabPage1);
             this.tabControl1.Controls.Add(this.tabPage2);
             this.tabControl1.Controls.Add(this.tabPage3);
+            this.tabControl1.Controls.Add(this.tabPage4);
             this.tabControl1.Location = new System.Drawing.Point(131, 171);
             this.tabControl1.Multiline = true;
             this.tabControl1.Name = "tabControl1";
@@ -251,9 +257,48 @@
             this.label3.Size = new System.Drawing.Size(313, 13);
             this.label3.TabIndex = 0;
             this.label3.Text = "Select the directory in which you want to find referring assemblies";
-            // 
+            //
+            // tabPage4
+            //
+            this.tabPage4.Controls.Add(this.versionInfoListView);
+            this.tabPage4.Location = new System.Drawing.Point(4, 22);
+            this.tabPage4.Name = "tabPage4";
+            this.tabPage4.Padding = new System.Windows.Forms.Padding(3);
+            this.tabPage4.Size = new System.Drawing.Size(665, 211);
+            this.tabPage4.TabIndex = 3;
+            this.tabPage4.Text = "Version Info";
+            this.tabPage4.UseVisualStyleBackColor = true;
+            //
+            // versionInfoListView
+            //
+            this.versionInfoListView.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+            | System.Windows.Forms.AnchorStyles.Left)
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.versionInfoListView.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
+            this.columnHeaderProperty,
+            this.columnHeaderValue});
+            this.versionInfoListView.FullRowSelect = true;
+            this.versionInfoListView.GridLines = true;
+            this.versionInfoListView.HeaderStyle = System.Windows.Forms.ColumnHeaderStyle.Nonclickable;
+            this.versionInfoListView.Location = new System.Drawing.Point(0, 0);
+            this.versionInfoListView.Name = "versionInfoListView";
+            this.versionInfoListView.Size = new System.Drawing.Size(665, 211);
+            this.versionInfoListView.TabIndex = 0;
+            this.versionInfoListView.UseCompatibleStateImageBehavior = false;
+            this.versionInfoListView.View = System.Windows.Forms.View.Details;
+            //
+            // columnHeaderProperty
+            //
+            this.columnHeaderProperty.Text = "Property";
+            this.columnHeaderProperty.Width = 180;
+            //
+            // columnHeaderValue
+            //
+            this.columnHeaderValue.Text = "Value";
+            this.columnHeaderValue.Width = 460;
+            //
             // targetProcessorTextBox
-            // 
+            //
             this.targetProcessorTextBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.targetProcessorTextBox.Location = new System.Drawing.Point(132, 105);
@@ -474,6 +519,7 @@
             this.tabPage2.ResumeLayout(false);
             this.tabPage3.ResumeLayout(false);
             this.tabPage3.PerformLayout();
+            this.tabPage4.ResumeLayout(false);
             this.menuStrip1.ResumeLayout(false);
             this.menuStrip1.PerformLayout();
             this.ResumeLayout(false);
@@ -519,5 +565,9 @@
         private System.Windows.Forms.TextBox frameWorkVersion;
         private System.Windows.Forms.ToolStripMenuItem openAssemblyToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator1;
+        private System.Windows.Forms.TabPage tabPage4;
+        private System.Windows.Forms.ListView versionInfoListView;
+        private System.Windows.Forms.ColumnHeader columnHeaderProperty;
+        private System.Windows.Forms.ColumnHeader columnHeaderValue;
     }
 }

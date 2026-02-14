@@ -56,6 +56,7 @@ namespace AssemblyInformation
             dependencyTreeView.Nodes.Clear();
             referenceListListBox.Items.Clear();
             referringAssembliesListtBox.Items.Clear();
+            versionInfoListView.Items.Clear();
 
             _assemblyPath = assemblyPath;
             assemblyInformation = new AssemblyInformationLoader(assemblyPath);
@@ -107,6 +108,8 @@ namespace AssemblyInformation
             frameWorkVersion.Text = assemblyInformation.FrameworkVersion;
             txtFullName.Text = assemblyInformation.AssemblyFullName;
 
+            FillVersionInfo();
+
             if (!assemblyInformation.IsManaged)
             {
                 // Native binary - show what we have, disable .NET-specific fields
@@ -124,6 +127,8 @@ namespace AssemblyInformation
                 txtEditAndContinue.Text = "N/A";
                 txtEditAndContinue.BackColor = SystemColors.Control;
                 txtEditAndContinue.ForeColor = SystemColors.GrayText;
+                // Show Version Info tab by default for native files (references are empty)
+                tabControl1.SelectedTab = tabPage4;
                 return;
             }
 
@@ -190,10 +195,46 @@ namespace AssemblyInformation
                 txtEditAndContinue.ForeColor = Color.White;
             }
 
+            // Reset to first tab for managed assemblies
+            tabControl1.SelectedIndex = 0;
+
             DependencyWalker dependencyWalker = new DependencyWalker();
             directDependencies = dependencyWalker.FindDependencies(_assemblyPath, false, out _).ToList();
 
             FillAssemblyReferences(directDependencies);
+        }
+
+        private void FillVersionInfo()
+        {
+            versionInfoListView.Items.Clear();
+            var vi = assemblyInformation.VersionInfo;
+            if (vi == null) return;
+
+            void AddItem(string property, string value)
+            {
+                if (!string.IsNullOrEmpty(value))
+                    versionInfoListView.Items.Add(new ListViewItem(new[] { property, value }));
+            }
+
+            AddItem("File Description", vi.FileDescription);
+            AddItem("File Version", vi.FileVersion);
+            AddItem("Product Name", vi.ProductName);
+            AddItem("Product Version", vi.ProductVersion);
+            AddItem("Company Name", vi.CompanyName);
+            AddItem("Legal Copyright", vi.LegalCopyright);
+            AddItem("Legal Trademarks", vi.LegalTrademarks);
+            AddItem("Original Filename", vi.OriginalFilename);
+            AddItem("Internal Name", vi.InternalName);
+            AddItem("Comments", vi.Comments);
+            AddItem("Language", vi.Language);
+            AddItem("Private Build", vi.PrivateBuild);
+            AddItem("Special Build", vi.SpecialBuild);
+
+            if (vi.IsDebug) AddItem("Is Debug", "Yes");
+            if (vi.IsPatched) AddItem("Is Patched", "Yes");
+            if (vi.IsPreRelease) AddItem("Is Pre-Release", "Yes");
+            if (vi.IsPrivateBuild) AddItem("Is Private Build", "Yes");
+            if (vi.IsSpecialBuild) AddItem("Is Special Build", "Yes");
         }
 
         private void FormMainFormClosing(object sender, FormClosingEventArgs e)
