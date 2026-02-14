@@ -26,8 +26,8 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore AssemblyInformation.sln
 
-      - name: Publish self-contained
-        run: dotnet publish AssemblyInformation/AssemblyInformation.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+      - name: Publish single-file exe
+        run: dotnet publish AssemblyInformation/AssemblyInformation.csproj -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true -o publish
 
       - name: Build shell extension
         run: msbuild AssemblyInformationShellExt/AssemblyInformation.vcxproj /p:Configuration=Release /p:Platform=x64
