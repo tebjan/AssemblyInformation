@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -14,7 +14,7 @@ namespace AssemblyInformation
     {
         private const string Loading = "Loading";
 
-        private readonly Assembly _mAssembly;
+        private readonly string _assemblyPath;
 
         private static readonly Dictionary<string, Form> AssemblyFormMap = new Dictionary<string, Form>();
 
@@ -24,13 +24,13 @@ namespace AssemblyInformation
 
         private List<Binary> directDependencies;
 
-        public FormMain(Assembly assemb)
+        public FormMain(string assemblyPath)
         {
             InitializeComponent();
-            _mAssembly = assemb;
-            assemblyInformation = new AssemblyInformationLoader(assemb);
-            referringAssemblyFolderTextBox.Text = Path.GetDirectoryName(_mAssembly.Location);
-            AssemblyFormMap[assemb.FullName] = this;
+            _assemblyPath = assemblyPath;
+            assemblyInformation = new AssemblyInformationLoader(assemblyPath);
+            referringAssemblyFolderTextBox.Text = Path.GetDirectoryName(assemblyPath);
+            AssemblyFormMap[assemblyPath] = this;
             FormClosing += FormMainFormClosing;
         }
 
@@ -38,8 +38,40 @@ namespace AssemblyInformation
         {
             string debuggableFlagsToolTipText;
 
+            // Prevent read-only display fields from receiving focus
+            txtTrackingEnabled.TabStop = false;
+            txtOptimized.TabStop = false;
+            txtSequencing.TabStop = false;
+            txtEditAndContinue.TabStop = false;
+            frameWorkVersion.TabStop = false;
+            assemblyKindTextBox.TabStop = false;
+            targetProcessorTextBox.TabStop = false;
+            txtFullName.TabStop = false;
+
             assemblyKindTextBox.Text = assemblyInformation.AssemblyKind;
             targetProcessorTextBox.Text = assemblyInformation.TargetProcessor;
+            frameWorkVersion.Text = assemblyInformation.FrameworkVersion;
+            txtFullName.Text = assemblyInformation.AssemblyFullName;
+
+            if (!assemblyInformation.IsManaged)
+            {
+                // Native binary - show what we have, disable .NET-specific fields
+                debuggableFlagsToolTipText = @"Debugging Flags: N/A (native binary)";
+                DebuggableFlagsToolTip.Tag = debuggableFlagsToolTipText;
+                txtTrackingEnabled.Text = "N/A";
+                txtTrackingEnabled.BackColor = SystemColors.Control;
+                txtTrackingEnabled.ForeColor = SystemColors.GrayText;
+                txtOptimized.Text = "N/A";
+                txtOptimized.BackColor = SystemColors.Control;
+                txtOptimized.ForeColor = SystemColors.GrayText;
+                txtSequencing.Text = "N/A";
+                txtSequencing.BackColor = SystemColors.Control;
+                txtSequencing.ForeColor = SystemColors.GrayText;
+                txtEditAndContinue.Text = "N/A";
+                txtEditAndContinue.BackColor = SystemColors.Control;
+                txtEditAndContinue.ForeColor = SystemColors.GrayText;
+                return;
+            }
 
             if (assemblyInformation.DebuggingFlags != null)
             {
@@ -56,59 +88,63 @@ namespace AssemblyInformation
             {
                 txtTrackingEnabled.Text = "Debug";
                 txtTrackingEnabled.BackColor = Color.Red;
+                txtTrackingEnabled.ForeColor = Color.White;
             }
             else
             {
                 txtTrackingEnabled.Text = "Release";
                 txtTrackingEnabled.BackColor = Color.Green;
+                txtTrackingEnabled.ForeColor = Color.White;
             }
 
             if (assemblyInformation.JitOptimized)
             {
                 txtOptimized.Text = "Optimized";
                 txtOptimized.BackColor = Color.Green;
+                txtOptimized.ForeColor = Color.White;
             }
             else
             {
                 txtOptimized.Text = "Not Optimized";
                 txtOptimized.BackColor = Color.Red;
+                txtOptimized.ForeColor = Color.White;
             }
 
             if (assemblyInformation.IgnoreSymbolStoreSequencePoints)
             {
                 txtSequencing.Text = "MSIL Sequencing";
                 txtSequencing.BackColor = Color.Green;
+                txtSequencing.ForeColor = Color.White;
             }
             else
             {
                 txtSequencing.Text = "PDB Sequencing";
                 txtSequencing.BackColor = assemblyInformation.JitTrackingEnabled ? Color.Red : Color.Orange;
+                txtSequencing.ForeColor = Color.White;
             }
 
             if (assemblyInformation.EditAndContinueEnabled)
             {
                 txtEditAndContinue.Text = "Edit and Continue Enabled";
                 txtEditAndContinue.BackColor = Color.Red;
+                txtEditAndContinue.ForeColor = Color.White;
             }
             else
             {
                 txtEditAndContinue.Text = "Edit and Continue Disabled";
                 txtEditAndContinue.BackColor = Color.Green;
+                txtEditAndContinue.ForeColor = Color.White;
             }
 
-            frameWorkVersion.Text = assemblyInformation.FrameworkVersion;
-            txtFullName.Text = assemblyInformation.AssemblyFullName;
-
             DependencyWalker dependencyWalker = new DependencyWalker();
-            List<string> errors;
-            directDependencies = dependencyWalker.FindDependencies(_mAssembly, false, out errors).ToList();
+            directDependencies = dependencyWalker.FindDependencies(_assemblyPath, false, out _).ToList();
 
             FillAssemblyReferences(directDependencies);
         }
 
         private void FormMainFormClosing(object sender, FormClosingEventArgs e)
         {
-            AssemblyFormMap.Remove(_mAssembly.FullName);
+            AssemblyFormMap.Remove(_assemblyPath);
         }
 
         private void FillAssemblyReferences(IEnumerable<Binary> dependencies, TreeNode treeNode = null)
@@ -187,59 +223,34 @@ namespace AssemblyInformation
             if (null != node)
             {
                 Binary binary = node.Tag as Binary;
-                if (null != binary)
+                if (binary?.FullPath != null)
                 {
-                    LoadAssemblyInformationForAssembly(binary.FullName);
+                    OpenAssemblyInformation(binary.FullPath);
                 }
             }
         }
 
-        private static string LoadAssemblyInformationForAssembly(string assemblyName)
+        private static void OpenAssemblyInformation(string assemblyPath)
         {
-            int retryCount = 0;
-            while (retryCount < 2)
+            if (!File.Exists(assemblyPath))
+                return;
+
+            if (!AssemblyFormMap.ContainsKey(assemblyPath))
             {
-                retryCount++;
                 try
                 {
-                    Assembly assembly = null;
-                    if (!File.Exists(assemblyName))
-                    {
-                        assembly = Assembly.Load(assemblyName);
-                    }
-                    else
-                    {
-                        FileInfo fileInfo = new FileInfo(assemblyName);
-                        assembly = Assembly.LoadFile(fileInfo.FullName);
-                    }
-
-                    if (null != assembly)
-                    {
-                        if (!AssemblyFormMap.ContainsKey(assembly.FullName))
-                        {
-                            var form = new FormMain(assembly);
-                            AssemblyFormMap[assembly.FullName] = form;
-                            form.Show();
-                        }
-                        else
-                        {
-                            Form form = AssemblyFormMap[assembly.FullName];
-                            form.BringToFront();
-                        }
-                    }
+                    var form = new FormMain(assemblyPath);
+                    form.Show();
                 }
-                catch (FileNotFoundException)
+                catch (Exception ex)
                 {
-                    string[] parts = assemblyName.Split(',');
-                    if (parts.Length > 0)
-                    {
-                        string name = parts[0].Trim() + ".dll";
-                        assemblyName = name;
-                    }
+                    MessageBox.Show(string.Format(Resource.LoadError, ex.Message), Resource.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
-                catch (Exception) { }
             }
-            return assemblyName;
+            else
+            {
+                AssemblyFormMap[assemblyPath].BringToFront();
+            }
         }
 
         private void DependencyTreeViewBeforeExpand(object sender, TreeViewCancelEventArgs e)
@@ -256,11 +267,11 @@ namespace AssemblyInformation
                     return;
                 }
 
+                // For lazy loading sub-dependencies, resolve and inspect from the same directory
+                var searchDir = Path.GetDirectoryName(_assemblyPath);
                 DependencyWalker dependencyWalker = new DependencyWalker();
-                List<string> errors;
-                var referredAssemblies =
-                    dependencyWalker.FindDependencies(new AssemblyName(binary.FullName), false,
-                                                      out errors);
+                var referredAssemblies = dependencyWalker.FindDependencies(
+                    new AssemblyName(binary.FullName), searchDir, false, out _);
 
                 FillAssemblyReferences(referredAssemblies, e.Node);
             }
@@ -268,6 +279,8 @@ namespace AssemblyInformation
 
         private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
         {
+            if (!assemblyInformation.IsManaged) return;
+
             if (tabControl1.SelectedIndex == 1 && referenceListListBox.Items.Count == 0)
             {
                 FillRecursiveDependency();
@@ -284,7 +297,7 @@ namespace AssemblyInformation
                 try
                 {
                     this.Cursor = Cursors.WaitCursor;
-                    recursiveDependencies = dependencyWalker.FindDependencies(_mAssembly, true, out errors).ToList();
+                    recursiveDependencies = dependencyWalker.FindDependencies(_assemblyPath, true, out errors).ToList();
                 }
                 finally
                 {
@@ -331,7 +344,7 @@ namespace AssemblyInformation
             {
                 FindReferringAssembliesForm frm = new FindReferringAssembliesForm();
                 frm.DirectoryPath = referringAssemblyFolderTextBox.Text;
-                frm.TestAssembly = _mAssembly;
+                frm.TestAssemblyFullName = assemblyInformation.AssemblyFullName;
                 frm.Recursive = true;
                 if (frm.ShowDialog() == DialogResult.OK)
                 {
@@ -363,26 +376,38 @@ namespace AssemblyInformation
             var selectedAssembly = listBox.SelectedItem.ToString();
             if (!selectedAssembly.Contains("ERROR"))
             {
-                LoadAssemblyInformationForAssembly(selectedAssembly);
+                // Try to resolve the assembly name to a file path in the same directory
+                var searchDir = Path.GetDirectoryName(_assemblyPath);
+                var parts = selectedAssembly.Split(',');
+                if (parts.Length > 0)
+                {
+                    var dllPath = Path.Combine(searchDir, parts[0].Trim() + ".dll");
+                    if (File.Exists(dllPath))
+                    {
+                        OpenAssemblyInformation(dllPath);
+                    }
+                }
             }
         }
 
         private void hideGACAssembliesToolStripMenuItem_Click(object sender, EventArgs e)
         {
             hideGACAssembliesToolStripMenuItem.Checked = !hideGACAssembliesToolStripMenuItem.Checked;
-            dependencyTreeView.Nodes.Clear();
-            FillAssemblyReferences(directDependencies);
-            if (recursiveDependencies != null)
-                FillRecursiveDependency();
+            RefreshDependencyDisplay();
         }
 
         private void showAssemblyFullNameToolStripMenuItem_Click(object sender, EventArgs e)
         {
             showAssemblyFullNameToolStripMenuItem.Checked =
                 !showAssemblyFullNameToolStripMenuItem.Checked;
+            RefreshDependencyDisplay();
+        }
 
+        private void RefreshDependencyDisplay()
+        {
             dependencyTreeView.Nodes.Clear();
-            FillAssemblyReferences(directDependencies);
+            if (directDependencies != null)
+                FillAssemblyReferences(directDependencies);
             if (recursiveDependencies != null)
                 FillRecursiveDependency();
         }
@@ -390,13 +415,9 @@ namespace AssemblyInformation
 
     internal class AssemblyNameComparer : IComparer<AssemblyName>
     {
-        #region IComparer<AssemblyName> Members
-
         public int Compare(AssemblyName x, AssemblyName y)
         {
             return String.Compare(x.FullName, y.FullName, StringComparison.InvariantCultureIgnoreCase);
         }
-
-        #endregion IComparer<AssemblyName> Members
     }
 }

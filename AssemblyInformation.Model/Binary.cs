@@ -12,11 +12,6 @@ namespace AssemblyInformation
             IsSystemBinary = isSystemBinary;
         }
 
-        public Binary(AssemblyName assemblyName, Assembly assembly)
-            : this(assemblyName, assembly.Location, assembly.GlobalAssemblyCache)
-        {
-        }
-
         public string DisplayName { get; private set; }
 
         public string FullName { get; private set; }

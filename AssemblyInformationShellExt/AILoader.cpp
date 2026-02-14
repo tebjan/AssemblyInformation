@@ -5,8 +5,7 @@
 #include "resource.h"
 #include "AILoader.h"
 #include "AssemblyInformation_i.h"
-//#include "ProgressDlg.h"
-#include "M:\Ashutosh\My Documents\Visual Studio 2008\Projects\Common\CPP\Debug.h"
+#include "Debug.h"
 
 TCHAR CAILoader::szAIAppPath[_MAX_ENV];
 
@@ -56,11 +55,6 @@ HRESULT CAILoader::Initialize (LPCITEMIDLIST pidlFolder, LPDATAOBJECT pDO, HKEY 
 	STGMEDIUM stg = { TYMED_HGLOBAL };
 	//HINSTANCE hinst;
 	bool      bChangedDir = false;
-	DWORD     dwLoadLibFlags = 0;
-	//HRESULT (STDAPICALLTYPE* pfn)();
-	
-	if ( (GetVersion() & 0x80000000) == 0 )
-		dwLoadLibFlags = DONT_RESOLVE_DLL_REFERENCES;
 
 	// Read the list of folders from the data object.  They're stored in HDROP
 	// form, so just get the HDROP handle and then use the drag 'n' drop APIs

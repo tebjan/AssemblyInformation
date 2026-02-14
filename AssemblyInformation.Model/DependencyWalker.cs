@@ -13,22 +13,32 @@ namespace AssemblyInformation.Model
 
         public event EventHandler<ReferringAssemblyStatusChangeEventArgs> ReferringAssemblyStatusChanged = delegate { };
 
-        public IEnumerable<Binary> FindDependencies(AssemblyName assemblyName, bool recursive, out List<string> loadErrors)
+        public IEnumerable<Binary> FindDependencies(string assemblyPath, bool recursive, out List<string> loadErrors)
         {
             loadErrors = new List<string>();
             assemblyMap.Clear();
-            var dependencies = new List<Binary>();
 
-            var assembly = FindAssembly(assemblyName);
-            if (null == assembly)
+            if (!File.Exists(assemblyPath))
             {
-                loadErrors.Add("Failed to load: " + assemblyName.FullName);
+                loadErrors.Add("File not found: " + assemblyPath);
+                return Enumerable.Empty<Binary>();
             }
-            else
+
+            var assemblyDir = Path.GetDirectoryName(assemblyPath);
+            var resolver = AssemblyInformationLoader.CreateAssemblyResolver(assemblyPath);
+
+            try
             {
-                FindDependencies(assembly, recursive);
-                dependencies.AddRange(assemblyMap.Values.OrderBy(p => p.FullName));
+                using var mlc = new MetadataLoadContext(resolver);
+                var assembly = mlc.LoadFromAssemblyPath(assemblyPath);
+                FindDependencies(mlc, assembly, assemblyDir, recursive, loadErrors);
             }
+            catch (Exception ex)
+            {
+                loadErrors.Add($"Failed to load {assemblyPath}: {ex.Message}");
+            }
+
+            var dependencies = assemblyMap.Values.OrderBy(p => p.FullName).ToList();
 
             foreach (var dependency in dependencies)
             {
@@ -38,22 +48,22 @@ namespace AssemblyInformation.Model
             return dependencies;
         }
 
-        public IEnumerable<Binary> FindDependencies(Assembly assembly, bool recursive, out List<string> loadErrors)
+        public IEnumerable<Binary> FindDependencies(AssemblyName assemblyName, string searchDirectory, bool recursive, out List<string> loadErrors)
         {
             loadErrors = new List<string>();
             assemblyMap.Clear();
-            FindDependencies(assembly, recursive);
-            var dependencies = new List<Binary>(assemblyMap.Values).OrderBy(p => p.FullName).ToList();
 
-            foreach (var dependency in dependencies)
+            var assemblyPath = ResolveAssemblyPath(assemblyName, searchDirectory);
+            if (assemblyPath == null)
             {
-                Trace.WriteLine(String.Format("{0} => {1}", dependency.DisplayName, dependency.IsSystemBinary));
+                loadErrors.Add("Failed to locate: " + assemblyName.FullName);
+                return Enumerable.Empty<Binary>();
             }
 
-            return dependencies;
+            return FindDependencies(assemblyPath, recursive, out loadErrors);
         }
 
-        public IEnumerable<string> FindReferringAssemblies(Assembly testAssembly, string directory, bool recursive)
+        public IEnumerable<string> FindReferringAssemblies(string testAssemblyFullName, string directory, bool recursive)
         {
             var referringAssemblies = new List<string>();
             var binaries = new List<string>();
@@ -96,88 +106,87 @@ namespace AssemblyInformation.Model
 
                 try
                 {
-                    var assembly = Assembly.LoadFile(binary);
                     var dw = new DependencyWalker();
-                    var dependencies = dw.FindDependencies(assembly, false, out var loadErrors);
-                    if (null == dependencies)
-                    {
-                        continue;
-                    }
+                    var dependencies = dw.FindDependencies(binary, false, out _);
 
-                    if (
-                        dependencies.Any(p => string.Compare(p.FullName, testAssembly.FullName, StringComparison.OrdinalIgnoreCase) == 0))
+                    if (dependencies.Any(p => string.Compare(p.FullName, testAssemblyFullName, StringComparison.OrdinalIgnoreCase) == 0))
                     {
                         referringAssemblies.Add(binary.Remove(0, baseDirPathLength));
                     }
-
-                    loadErrors.AddRange(loadErrors);
                 }
-                catch (ArgumentException)
-                {
-                }
-                catch (FileLoadException)
-                {
-                }
-                catch (FileNotFoundException)
-                {
-                }
-                catch (BadImageFormatException)
-                {
-                }
+                catch (ArgumentException) { }
+                catch (FileLoadException) { }
+                catch (FileNotFoundException) { }
+                catch (BadImageFormatException) { }
             }
 
             return referringAssemblies.OrderBy(p => p);
         }
 
-        private static Assembly FindAssembly(AssemblyName assName)
+        private void FindDependencies(MetadataLoadContext mlc, Assembly assembly, string searchDirectory, bool recursive, List<string> loadErrors)
         {
-            var retryCount = 0;
-            Assembly assembly = null;
-            var assemblyName = assName.FullName;
-
-            while (retryCount < 2)
+            AssemblyName[] references;
+            try
             {
-                retryCount++;
-                try
-                {
-                    if (!File.Exists(assemblyName))
-                    {
-                        assembly = Assembly.Load(assemblyName);
-                    }
-                    else
-                    {
-                        var fileInfo = new FileInfo(assemblyName);
-                        assembly = Assembly.LoadFile(fileInfo.FullName);
-                    }
-
-                    break;
-                }
-                catch (FileNotFoundException)
-                {
-                    if (assemblyName.EndsWith(".dll"))
-                    {
-                        continue;
-                    }
-
-                    var parts = assemblyName.Split(',');
-                    if (parts.Length > 0)
-                    {
-                        var name = parts[0].Trim() + ".dll";
-                        assemblyName = name;
-                    }
-                }
-                catch (ArgumentException)
-                {
-                }
-                catch (IOException)
-                {
-                }
-                catch (BadImageFormatException)
-                {
-                }
+                references = assembly.GetReferencedAssemblies();
+            }
+            catch (Exception ex)
+            {
+                loadErrors.Add($"Failed to get references from {assembly.GetName().Name}: {ex.Message}");
+                return;
             }
 
-            return assembly;
+            foreach (var referencedAssembly in references)
+            {
+                var name = referencedAssembly.FullName;
+
+                if (assemblyMap.ContainsKey(name))
+                {
+                    continue;
+                }
+
+                assemblyMap[name] = new Binary(referencedAssembly);
+
+                if (AssemblyInformationLoader.SystemAssemblies.Any(p => referencedAssembly.FullName.StartsWith(p)))
+                {
+                    assemblyMap[name].IsSystemBinary = true;
+                    continue;
+                }
+
+                if (!recursive) continue;
+
+                // Try to resolve and recurse
+                var resolvedPath = ResolveAssemblyPath(referencedAssembly, searchDirectory);
+                if (resolvedPath != null)
+                {
+                    assemblyMap[name] = new Binary(referencedAssembly, resolvedPath);
+                    try
+                    {
+                        var refAssembly = mlc.LoadFromAssemblyPath(resolvedPath);
+                        FindDependencies(mlc, refAssembly, searchDirectory, true, loadErrors);
+                    }
+                    catch (Exception ex)
+                    {
+                        loadErrors.Add($"Failed to load {referencedAssembly.Name}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        private static string ResolveAssemblyPath(AssemblyName assemblyName, string searchDirectory)
+        {
+            if (string.IsNullOrEmpty(searchDirectory))
+                return null;
+
+            var dllPath = Path.Combine(searchDirectory, assemblyName.Name + ".dll");
+            if (File.Exists(dllPath))
+                return dllPath;
+
+            var exePath = Path.Combine(searchDirectory, assemblyName.Name + ".exe");
+            if (File.Exists(exePath))
+                return exePath;
+
+            return null;
         }
 
         private void FindAssemblies(DirectoryInfo directoryInfo, List<string> binaries, bool recursive)
@@ -199,41 +208,12 @@ namespace AssemblyInformation.Model
             }
         }
 
-        private void FindDependencies(Assembly assembly, bool recursive)
-        {
-            foreach (var referencedAssembly in assembly.GetReferencedAssemblies())
-            {
-                var name = referencedAssembly.FullName;
-
-                if (assemblyMap.ContainsKey(name))
-                {
-                    continue;
-                }
-
-                assemblyMap[name] = new Binary(referencedAssembly);
-
-                if (AssemblyInformationLoader.SystemAssemblies.Count(p => referencedAssembly.FullName.StartsWith(p)) > 0)
-                {
-                    assemblyMap[name].IsSystemBinary = true;
-                    continue;
-                }
-
-                if (!recursive) continue;
-                var referredAssembly = FindAssembly(referencedAssembly);
-
-                if (null == referredAssembly) continue;
-                assemblyMap[name] = new Binary(referencedAssembly, referredAssembly);
-                FindDependencies(referredAssembly, true);
-            }
-        }
-
         private bool UpdateProgress(string message, int progress)
         {
             if (null == ReferringAssemblyStatusChanged) return true;
             var eventArg = new ReferringAssemblyStatusChangeEventArgs { StatusText = message, Progress = progress };
             ReferringAssemblyStatusChanged(this, eventArg);
             return !eventArg.Cancel;
-
         }
     }
 }

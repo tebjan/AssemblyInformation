@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
@@ -14,8 +16,26 @@ namespace AssemblyInformation
             labelProductName.Text = AssemblyProduct;
             labelVersion.Text = $"Version {AssemblyVersion}";
             labelCopyright.Text = AssemblyCopyright;
-            labelCompanyName.Text = AssemblyCompany;
-            textBoxDescription.Text = AssemblyDescription;
+            textBoxDescription.Text = AssemblyDescription
+                + Environment.NewLine + Environment.NewLine
+                + "Developed by Tebjan Halm"
+                + Environment.NewLine
+                + "Originally created by Ashutosh Bhawasinka";
+
+            // Replace company label with clickable website link
+            var websiteLink = new LinkLabel
+            {
+                Text = "https://tebjan.de",
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(3, 0, 0, 0)
+            };
+            websiteLink.LinkClicked += (s, e) =>
+            {
+                Process.Start(new ProcessStartInfo("https://tebjan.de") { UseShellExecute = true });
+            };
+            tableLayoutPanel.Controls.Remove(labelCompanyName);
+            tableLayoutPanel.Controls.Add(websiteLink, 1, 3);
         }
 
         #region Assembly Attribute Accessors
@@ -34,7 +54,7 @@ namespace AssemblyInformation
                     }
                 }
 
-                return Path.GetFileNameWithoutExtension(Assembly.GetExecutingAssembly().CodeBase);
+                return Path.GetFileNameWithoutExtension(Assembly.GetExecutingAssembly().Location);
             }
         }
 

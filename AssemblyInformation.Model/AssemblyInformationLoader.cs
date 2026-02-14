@@ -1,9 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.Versioning;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 
 namespace AssemblyInformation.Model
 {
@@ -16,39 +18,28 @@ namespace AssemblyInformation.Model
             "Windows",
             "PresentationCore",
             "PresentationFramework",
-            "Microsoft.VisualC"
+            "Microsoft.VisualC",
+            "System.Runtime",
+            "System.Private",
+            "netstandard"
         };
 
-        private static readonly Dictionary<ImageFileMachine, string> ImageFileMachineNames =
-            new Dictionary<ImageFileMachine, string>();
-
-        private static readonly Dictionary<PortableExecutableKinds, string> PortableExecutableKindsNames =
-            new Dictionary<PortableExecutableKinds, string>();
-
-        static AssemblyInformationLoader()
+        private static readonly Dictionary<Machine, string> MachineNames = new Dictionary<Machine, string>
         {
-            PortableExecutableKindsNames[PortableExecutableKinds.ILOnly] =
-                "Contains only Microsoft intermediate language (MSIL), and is therefore neutral with respect to 32-bit or 64-bit platforms.";
-            PortableExecutableKindsNames[PortableExecutableKinds.NotAPortableExecutableImage] =
-                "Not in portable executable (PE) file format.";
-            PortableExecutableKindsNames[PortableExecutableKinds.PE32Plus] = "Requires a 64-bit platform.";
-            PortableExecutableKindsNames[PortableExecutableKinds.Required32Bit] =
-                "Can be run on a 32-bit platform, or in the 32-bit Windows on Windows (WOW) environment on a 64-bit platform.";
-            PortableExecutableKindsNames[PortableExecutableKinds.Unmanaged32Bit] = "Contains pure unmanaged code.";
-            PortableExecutableKindsNames[PortableExecutableKinds.Preferred32Bit] = "Platform-agnostic, but 32-bit preferred.";
+            [Machine.I386] = "Targets a 32-bit Intel processor.",
+            [Machine.IA64] = "Targets a 64-bit Intel processor.",
+            [Machine.Amd64] = "Targets a 64-bit AMD processor.",
+            [Machine.Arm] = "Targets an ARM processor.",
+            [Machine.Arm64] = "Targets an ARM64 processor.",
+        };
 
-            ImageFileMachineNames[ImageFileMachine.I386] = "Targets a 32-bit Intel processor.";
-            ImageFileMachineNames[ImageFileMachine.IA64] = "Targets a 64-bit Intel processor.";
-            ImageFileMachineNames[ImageFileMachine.AMD64] = "Targets a 64-bit AMD processor.";
-        }
-
-        public AssemblyInformationLoader(Assembly assembly)
+        public AssemblyInformationLoader(string filePath)
         {
-            Assembly = assembly;
+            FilePath = filePath;
             LoadInformation();
         }
 
-        public Assembly Assembly { get; }
+        public string FilePath { get; }
 
         public string AssemblyFullName { get; private set; }
 
@@ -71,67 +62,141 @@ namespace AssemblyInformation.Model
 
         public string TargetProcessor { get; private set; }
 
+        /// <summary>
+        /// True if the file is a .NET managed assembly (has CLI metadata).
+        /// </summary>
+        public bool IsManaged { get; private set; }
+
+        public AssemblyName[] GetReferencedAssemblies()
+        {
+            if (!IsManaged) return Array.Empty<AssemblyName>();
+
+            var resolver = CreateAssemblyResolver(FilePath);
+            using var mlc = new MetadataLoadContext(resolver);
+            var assembly = mlc.LoadFromAssemblyPath(FilePath);
+            return assembly.GetReferencedAssemblies();
+        }
+
         private void LoadInformation()
         {
             DetermineExecutableKind();
-
-            DetermineDebuggingAttributes();
-
-            AssemblyFullName = Assembly.FullName;
-
-            DetermineFrameworkVersion();
+            if (IsManaged)
+            {
+                DetermineMetadata();
+            }
+            else
+            {
+                AssemblyFullName = Path.GetFileName(FilePath);
+                FrameworkVersion = "N/A (native)";
+            }
         }
 
         private void DetermineExecutableKind()
         {
-            var modules = Assembly.GetModules(false);
-            if (modules.Length <= 0) return;
+            using var stream = File.OpenRead(FilePath);
+            using var peReader = new PEReader(stream);
 
-            modules[0].GetPEKind(out var portableExecutableKinds, out var imageFileMachine);
+            var peHeaders = peReader.PEHeaders;
+            var machine = peHeaders.CoffHeader.Machine;
 
-            foreach (PortableExecutableKinds kind in Enum.GetValues(typeof(PortableExecutableKinds)))
+            // Determine target processor from PE header (works for native and managed)
+            if (MachineNames.TryGetValue(machine, out var machineName))
             {
-                if ((portableExecutableKinds & kind) == kind && kind != PortableExecutableKinds.NotAPortableExecutableImage)
-                {
-                    if (!String.IsNullOrEmpty(AssemblyKind))
-                    {
-                        AssemblyKind += Environment.NewLine;
-                    }
-
-                    AssemblyKind += "- " + PortableExecutableKindsNames[kind];
-                }
+                TargetProcessor = machineName;
+            }
+            else
+            {
+                TargetProcessor = $"Unknown ({machine})";
             }
 
-            TargetProcessor = ImageFileMachineNames[imageFileMachine];
+            if (!peReader.HasMetadata)
+            {
+                IsManaged = false;
+                AssemblyKind = "Native binary (not a .NET assembly)";
+                return;
+            }
 
-            // Any CPU builds are reported as 32bit.
-            // 32bit builds will have more value for PortableExecutableKinds
-            if (imageFileMachine == ImageFileMachine.I386 && portableExecutableKinds == PortableExecutableKinds.ILOnly)
+            IsManaged = true;
+            var corFlags = peHeaders.CorHeader?.Flags ?? 0;
+
+            // Determine assembly kind from CorFlags
+            var kindParts = new List<string>();
+            if ((corFlags & CorFlags.ILOnly) != 0)
+                kindParts.Add("- Contains only Microsoft intermediate language (MSIL), and is therefore neutral with respect to 32-bit or 64-bit platforms.");
+            if (peHeaders.PEHeader.Magic == PEMagic.PE32Plus)
+                kindParts.Add("- Requires a 64-bit platform.");
+            if ((corFlags & CorFlags.Requires32Bit) != 0)
+                kindParts.Add("- Can be run on a 32-bit platform, or in the 32-bit Windows on Windows (WOW) environment on a 64-bit platform.");
+            if ((corFlags & CorFlags.Prefers32Bit) != 0)
+                kindParts.Add("- Platform-agnostic, but 32-bit preferred.");
+
+            AssemblyKind = kindParts.Count > 0 ? string.Join(Environment.NewLine, kindParts) : "Unknown";
+
+            // Any CPU: ILOnly + I386 without Requires32Bit
+            if (machine == Machine.I386 &&
+                (corFlags & CorFlags.ILOnly) != 0 &&
+                (corFlags & CorFlags.Requires32Bit) == 0 &&
+                (corFlags & CorFlags.Prefers32Bit) == 0)
             {
                 TargetProcessor = "AnyCPU";
             }
         }
 
-        private void DetermineDebuggingAttributes()
+        private void DetermineMetadata()
         {
-            var debugAttribute = Assembly.GetCustomAttributes(false).OfType<DebuggableAttribute>().FirstOrDefault();
-            if (debugAttribute != null)
-            {
-                JitTrackingEnabled = debugAttribute.IsJITTrackingEnabled;
-                JitOptimized = !debugAttribute.IsJITOptimizerDisabled;
-                IgnoreSymbolStoreSequencePoints =
-                    (debugAttribute.DebuggingFlags &
-                     DebuggableAttribute.DebuggingModes.IgnoreSymbolStoreSequencePoints) !=
-                    DebuggableAttribute.DebuggingModes.None;
-                EditAndContinueEnabled =
-                    (debugAttribute.DebuggingFlags &
-                     DebuggableAttribute.DebuggingModes.EnableEditAndContinue) != DebuggableAttribute.DebuggingModes.None;
+            var resolver = CreateAssemblyResolver(FilePath);
+            using var mlc = new MetadataLoadContext(resolver);
 
-                DebuggingFlags = debugAttribute.DebuggingFlags;
+            Assembly assembly;
+            try
+            {
+                assembly = mlc.LoadFromAssemblyPath(FilePath);
+            }
+            catch (Exception)
+            {
+                AssemblyFullName = Path.GetFileName(FilePath);
+                FrameworkVersion = "Unknown";
+                return;
+            }
+
+            AssemblyFullName = assembly.FullName;
+            FrameworkVersion = assembly.ImageRuntimeVersion;
+
+            DetermineDebuggingAttributes(assembly);
+            DetermineFrameworkVersion(assembly);
+        }
+
+        private void DetermineDebuggingAttributes(Assembly assembly)
+        {
+            // MetadataLoadContext can't instantiate attributes, so use GetCustomAttributesData
+            var debugAttrData = assembly.GetCustomAttributesData()
+                .FirstOrDefault(a => a.AttributeType.FullName == "System.Diagnostics.DebuggableAttribute");
+
+            if (debugAttrData != null)
+            {
+                // DebuggableAttribute has two constructors:
+                // (DebuggingModes) or (bool isJITTrackingEnabled, bool isJITOptimizerDisabled)
+                if (debugAttrData.ConstructorArguments.Count == 1)
+                {
+                    // Single arg: DebuggingModes enum value
+                    var flags = (DebuggableAttribute.DebuggingModes)(int)debugAttrData.ConstructorArguments[0].Value;
+                    DebuggingFlags = flags;
+                    JitTrackingEnabled = (flags & DebuggableAttribute.DebuggingModes.Default) != 0;
+                    JitOptimized = (flags & DebuggableAttribute.DebuggingModes.DisableOptimizations) == 0;
+                    IgnoreSymbolStoreSequencePoints = (flags & DebuggableAttribute.DebuggingModes.IgnoreSymbolStoreSequencePoints) != 0;
+                    EditAndContinueEnabled = (flags & DebuggableAttribute.DebuggingModes.EnableEditAndContinue) != 0;
+                }
+                else if (debugAttrData.ConstructorArguments.Count == 2)
+                {
+                    // Two args: (bool isJITTrackingEnabled, bool isJITOptimizerDisabled)
+                    JitTrackingEnabled = (bool)debugAttrData.ConstructorArguments[0].Value;
+                    JitOptimized = !(bool)debugAttrData.ConstructorArguments[1].Value;
+                    IgnoreSymbolStoreSequencePoints = false;
+                    EditAndContinueEnabled = false;
+                }
             }
             else
             {
-                // No DebuggableAttribute means IsJITTrackingEnabled=false, IsJITOptimizerDisabled=false, IgnoreSymbolStoreSequencePoints=false, EnableEditAndContinue=false
                 JitTrackingEnabled = false;
                 JitOptimized = true;
                 IgnoreSymbolStoreSequencePoints = false;
@@ -140,17 +205,90 @@ namespace AssemblyInformation.Model
             }
         }
 
-        private void DetermineFrameworkVersion()
+        private void DetermineFrameworkVersion(Assembly assembly)
         {
-            FrameworkVersion = Assembly.ImageRuntimeVersion;
+            var targetFwAttr = assembly.GetCustomAttributesData()
+                .FirstOrDefault(a => a.AttributeType.FullName == "System.Runtime.Versioning.TargetFrameworkAttribute");
 
-            var attributes = Assembly.GetCustomAttributes(true);
-            var targetFrameworkAttribute = attributes.OfType<TargetFrameworkAttribute>().FirstOrDefault();
-
-            if (targetFrameworkAttribute != null)
+            if (targetFwAttr != null)
             {
-                FrameworkVersion = targetFrameworkAttribute.FrameworkDisplayName;
+                // First constructor arg is the FrameworkName string (e.g., ".NETFramework,Version=v4.7")
+                var frameworkName = targetFwAttr.ConstructorArguments[0].Value?.ToString();
+
+                // Check for FrameworkDisplayName named argument
+                var displayNameArg = targetFwAttr.NamedArguments?
+                    .FirstOrDefault(a => a.MemberName == "FrameworkDisplayName");
+                if (displayNameArg.HasValue && displayNameArg.Value.TypedValue.Value is string displayName && !string.IsNullOrEmpty(displayName))
+                {
+                    FrameworkVersion = displayName;
+                }
+                else if (!string.IsNullOrEmpty(frameworkName))
+                {
+                    FrameworkVersion = frameworkName;
+                }
             }
+        }
+
+        internal static PathAssemblyResolver CreateAssemblyResolver(string assemblyPath)
+        {
+            var assemblyDir = Path.GetDirectoryName(assemblyPath);
+
+            // Keyed by file name (e.g. "mscorlib.dll") to prevent duplicates.
+            // Earlier additions win, so order matters: target dir > runtime > framework refs.
+            var pathsByName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            void AddFile(string file)
+            {
+                var name = Path.GetFileName(file);
+                pathsByName.TryAdd(name, file);
+            }
+
+            // 1. Target assembly's directory (highest priority)
+            if (!string.IsNullOrEmpty(assemblyDir))
+            {
+                foreach (var file in Directory.GetFiles(assemblyDir, "*.dll"))
+                    AddFile(file);
+                foreach (var file in Directory.GetFiles(assemblyDir, "*.exe"))
+                    AddFile(file);
+            }
+
+            // 2. Current runtime's assemblies
+            var runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location);
+            if (!string.IsNullOrEmpty(runtimeDir))
+            {
+                foreach (var file in Directory.GetFiles(runtimeDir, "*.dll"))
+                    AddFile(file);
+            }
+
+            // 3. .NET Framework reference assemblies (for inspecting Framework assemblies)
+            var frameworkRefBase = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                "Reference Assemblies", "Microsoft", "Framework", ".NETFramework");
+
+            if (Directory.Exists(frameworkRefBase))
+            {
+                var versions = Directory.GetDirectories(frameworkRefBase)
+                    .OrderByDescending(d => d)
+                    .ToList();
+
+                foreach (var versionDir in versions)
+                {
+                    foreach (var file in Directory.GetFiles(versionDir, "*.dll"))
+                        AddFile(file);
+
+                    var facadesDir = Path.Combine(versionDir, "Facades");
+                    if (Directory.Exists(facadesDir))
+                    {
+                        foreach (var file in Directory.GetFiles(facadesDir, "*.dll"))
+                            AddFile(file);
+                    }
+                }
+            }
+
+            // Ensure the target assembly itself is included
+            pathsByName[Path.GetFileName(assemblyPath)] = assemblyPath;
+
+            return new PathAssemblyResolver(pathsByName.Values);
         }
     }
 }

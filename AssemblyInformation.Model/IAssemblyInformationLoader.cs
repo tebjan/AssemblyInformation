@@ -1,11 +1,10 @@
 ﻿using System.Diagnostics;
-using System.Reflection;
 
 namespace AssemblyInformation.Model
 {
     public interface IAssemblyInformationLoader
     {
-        Assembly Assembly { get; }
+        string FilePath { get; }
         string AssemblyFullName { get; }
         string AssemblyKind { get; }
         DebuggableAttribute.DebuggingModes? DebuggingFlags { get; }

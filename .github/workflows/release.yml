@@ -1,0 +1,42 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore dependencies
+        run: dotnet restore AssemblyInformation.sln
+
+      - name: Publish self-contained
+        run: dotnet publish AssemblyInformation/AssemblyInformation.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+
+      - name: Build framework-dependent
+        run: dotnet build AssemblyInformation.sln -c Release --no-restore
+
+      - name: Create release zip
+        run: |
+          Compress-Archive -Path publish\AssemblyInformation.exe -DestinationPath AssemblyInformation-${{ github.ref_name }}-win-x64.zip
+        shell: pwsh
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            AssemblyInformation-${{ github.ref_name }}-win-x64.zip

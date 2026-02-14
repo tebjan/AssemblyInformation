@@ -1,6 +1,5 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Threading;
 using System.Windows.Forms;
 using AssemblyInformation.Model;
@@ -17,7 +16,7 @@ namespace AssemblyInformation
             messageLabel.Text = "";
         }
 
-        public Assembly TestAssembly { get; set; }
+        public string TestAssemblyFullName { get; set; }
 
         public string DirectoryPath { get; set; }
 
@@ -43,7 +42,7 @@ namespace AssemblyInformation
             {
                 dw = new DependencyWalker();
                 dw.ReferringAssemblyStatusChanged += UpdateStatus;
-                ReferringAssemblies = dw.FindReferringAssemblies(TestAssembly, DirectoryPath, Recursive);
+                ReferringAssemblies = dw.FindReferringAssemblies(TestAssemblyFullName, DirectoryPath, Recursive);
                 UpdateStatus(this, new ReferringAssemblyStatusChangeEventArgs { StatusText = "", Progress = -3 });
             }
             catch (Exception)
@@ -80,7 +79,7 @@ namespace AssemblyInformation
             else if (e.Progress == -2)
             {
                 DialogResult = DialogResult.Cancel;
-                MessageBox.Show(Resource.AppName, e.StatusText, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(e.StatusText, Resource.AppName, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 Close();
                 return;
             }
