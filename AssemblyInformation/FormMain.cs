@@ -59,14 +59,24 @@ namespace AssemblyInformation
 
             _assemblyPath = assemblyPath;
             assemblyInformation = new AssemblyInformationLoader(assemblyPath);
-            referringAssemblyFolderTextBox.Text = Path.GetDirectoryName(assemblyPath);
-            AssemblyFormMap[assemblyPath] = this;
-            Text = $"Assembly Information - {Path.GetFileName(assemblyPath)}";
+
+            // If this is a .NET apphost exe, automatically load the companion managed dll
+            if (assemblyInformation.ApphostManagedDll != null)
+            {
+                _assemblyPath = assemblyInformation.ApphostManagedDll;
+                assemblyInformation = new AssemblyInformationLoader(_assemblyPath);
+            }
+
+            referringAssemblyFolderTextBox.Text = Path.GetDirectoryName(_assemblyPath);
+            AssemblyFormMap[_assemblyPath] = this;
+            Text = $"Assembly Information - {Path.GetFileName(_assemblyPath)}";
             panel1.Visible = true;
             dropHintLabel.Visible = false;
 
-            // Re-run the load logic
-            FormMainLoad(this, EventArgs.Empty);
+            // Only call FormMainLoad directly if the form is already shown.
+            // On first construction, the Form.Load event will call it.
+            if (IsHandleCreated)
+                FormMainLoad(this, EventArgs.Empty);
         }
 
         private void FormMainLoad(object sender, EventArgs e)

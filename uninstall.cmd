@@ -19,10 +19,16 @@ if exist "%INSTALL_DIR%\AssemblyInformation.dll" (
     regsvr32 /u /s "%INSTALL_DIR%\AssemblyInformation.dll"
 )
 
+:: Restart Explorer to release the loaded DLL
+echo Restarting Explorer ...
+taskkill /f /im explorer.exe >nul 2>&1
+timeout /t 1 /nobreak >nul
+start explorer.exe
+
 :: Remove files
-if exist "%INSTALL_DIR%\AssemblyInformation.exe" del "%INSTALL_DIR%\AssemblyInformation.exe"
-if exist "%INSTALL_DIR%\AssemblyInformation.dll" del "%INSTALL_DIR%\AssemblyInformation.dll"
-if exist "%INSTALL_DIR%" rmdir "%INSTALL_DIR%"
+if exist "%INSTALL_DIR%\AssemblyInformation.exe" del /f /q "%INSTALL_DIR%\AssemblyInformation.exe"
+if exist "%INSTALL_DIR%\AssemblyInformation.dll" del /f /q "%INSTALL_DIR%\AssemblyInformation.dll"
+if exist "%INSTALL_DIR%" rmdir /q "%INSTALL_DIR%" 2>nul
 
 echo.
 echo Uninstallation complete.

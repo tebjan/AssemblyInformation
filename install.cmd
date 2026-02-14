@@ -14,6 +14,14 @@ set "INSTALL_DIR=%ProgramFiles%\AssemblyInformation"
 
 echo Installing .NET Assembly Information to %INSTALL_DIR% ...
 
+:: If upgrading, unregister old shell extension and restart Explorer to release it
+if exist "%INSTALL_DIR%\AssemblyInformation.dll" (
+    regsvr32 /u /s "%INSTALL_DIR%\AssemblyInformation.dll"
+    taskkill /f /im explorer.exe >nul 2>&1
+    timeout /t 1 /nobreak >nul
+    start explorer.exe
+)
+
 :: Create install directory
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 

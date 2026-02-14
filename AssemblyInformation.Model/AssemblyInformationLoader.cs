@@ -67,6 +67,12 @@ namespace AssemblyInformation.Model
         /// </summary>
         public bool IsManaged { get; private set; }
 
+        /// <summary>
+        /// If the file is a .NET apphost (native exe with a companion managed dll),
+        /// contains the path to the managed assembly. Null otherwise.
+        /// </summary>
+        public string ApphostManagedDll { get; private set; }
+
         public AssemblyName[] GetReferencedAssemblies()
         {
             if (!IsManaged) return Array.Empty<AssemblyName>();
@@ -112,6 +118,29 @@ namespace AssemblyInformation.Model
             if (!peReader.HasMetadata)
             {
                 IsManaged = false;
+
+                // Check if this is a .NET apphost (native exe with companion managed dll)
+                var ext = Path.GetExtension(FilePath);
+                if (string.Equals(ext, ".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    var companionDll = Path.ChangeExtension(FilePath, ".dll");
+                    if (File.Exists(companionDll))
+                    {
+                        try
+                        {
+                            using var dllStream = File.OpenRead(companionDll);
+                            using var dllPe = new PEReader(dllStream);
+                            if (dllPe.HasMetadata)
+                            {
+                                ApphostManagedDll = companionDll;
+                                AssemblyKind = $".NET runtime host (managed assembly is {Path.GetFileName(companionDll)})";
+                                return;
+                            }
+                        }
+                        catch { }
+                    }
+                }
+
                 AssemblyKind = "Native binary (not a .NET assembly)";
                 return;
             }
