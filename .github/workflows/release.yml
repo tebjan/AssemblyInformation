@@ -37,7 +37,7 @@ jobs:
           $stagingDir = "staging"
           New-Item -ItemType Directory -Path $stagingDir
           Copy-Item publish\AssemblyInformation.exe $stagingDir\
-          Copy-Item AssemblyInformationShellExt\x64\Release\AssemblyInformation.dll $stagingDir\
+          Copy-Item AssemblyInformationShellExt\bin\Release\AssemblyInformation.dll $stagingDir\
           Copy-Item install.cmd $stagingDir\
           Copy-Item uninstall.cmd $stagingDir\
           Compress-Archive -Path $stagingDir\* -DestinationPath AssemblyInformation-${{ github.ref_name }}-win-x64.zip
