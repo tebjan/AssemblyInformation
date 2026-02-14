@@ -90,8 +90,10 @@ namespace AssemblyInformation.Model
             {
                 DetermineMetadata();
             }
-            else
+            else if (AssemblyFullName == null)
             {
+                // Only set defaults if DetermineExecutableKind didn't already set them
+                // (e.g. single-file bundle sets its own values)
                 AssemblyFullName = Path.GetFileName(FilePath);
                 FrameworkVersion = "N/A (native)";
             }
@@ -118,6 +120,15 @@ namespace AssemblyInformation.Model
             if (!peReader.HasMetadata)
             {
                 IsManaged = false;
+
+                // Check if this is a .NET single-file bundle
+                if (IsSingleFileBundle(FilePath, out var fileCount))
+                {
+                    AssemblyKind = $"Single-file .NET bundle ({fileCount} embedded files)";
+                    AssemblyFullName = Path.GetFileName(FilePath);
+                    FrameworkVersion = "Embedded in bundle";
+                    return;
+                }
 
                 // Check if this is a .NET apphost (native exe with companion managed dll)
                 var ext = Path.GetExtension(FilePath);
@@ -255,6 +266,56 @@ namespace AssemblyInformation.Model
                 {
                     FrameworkVersion = frameworkName;
                 }
+            }
+        }
+
+        /// <summary>
+        /// Detects whether a file is a .NET single-file bundle by checking for the bundle signature.
+        /// </summary>
+        private static bool IsSingleFileBundle(string filePath, out int fileCount)
+        {
+            fileCount = 0;
+            try
+            {
+                // .NET single-file bundle signature: SHA-256 of ".net core bundle"
+                byte[] bundleSignature =
+                {
+                    0x8b, 0x12, 0x02, 0xb9, 0x6a, 0x61, 0x20, 0x38,
+                    0x72, 0x7b, 0x4d, 0x12, 0xa1, 0x78, 0xc5, 0x7b,
+                    0x22, 0x57, 0xee, 0xf6, 0x57, 0x10, 0x69, 0xe4,
+                    0x20, 0x52, 0x2c, 0x8f, 0x43, 0x75, 0x65, 0xf9
+                };
+
+                using var stream = File.OpenRead(filePath);
+                if (stream.Length < 50) return false;
+
+                // Last 8 bytes of the file contain the offset to the bundle header
+                stream.Seek(-8, SeekOrigin.End);
+                var offsetBuffer = new byte[8];
+                stream.Read(offsetBuffer, 0, 8);
+                long headerOffset = BitConverter.ToInt64(offsetBuffer, 0);
+
+                if (headerOffset <= 0 || headerOffset >= stream.Length - 32) return false;
+
+                // Read signature at the header offset
+                stream.Seek(headerOffset, SeekOrigin.Begin);
+                var signature = new byte[32];
+                stream.Read(signature, 0, 32);
+
+                for (int i = 0; i < 32; i++)
+                {
+                    if (signature[i] != bundleSignature[i]) return false;
+                }
+
+                // Read version (major, minor) and file count
+                var header = new byte[12];
+                stream.Read(header, 0, 12);
+                fileCount = BitConverter.ToInt32(header, 8);
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
 
