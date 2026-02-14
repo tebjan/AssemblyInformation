@@ -14,7 +14,7 @@
     <Description>Windows Explorer extension that displays .NET assembly metadata: compilation mode, full name, framework version, PE kind, target processor, and assembly references.</Description>
     <Authors>Tebjan Halm</Authors>
     <Company>Tebjan Halm</Company>
-    <Copyright>Copyright (c) Tebjan Halm. Originally by Ashutosh Bhawasinka.</Copyright>
+    <Copyright>Copyright (c) Tebjan Halm. Originally by Rotem Bloom and Ashutosh Bhawasinka.</Copyright>
     <PackageProjectUrl>https://tebjan.de</PackageProjectUrl>
     <RepositoryUrl>https://github.com/tebjan/AssemblyInformation</RepositoryUrl>
     <RepositoryType>git</RepositoryType>

@@ -20,18 +20,27 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
       - name: Restore dependencies
         run: dotnet restore AssemblyInformation.sln
 
       - name: Publish self-contained
         run: dotnet publish AssemblyInformation/AssemblyInformation.csproj -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
 
-      - name: Build framework-dependent
-        run: dotnet build AssemblyInformation.sln -c Release --no-restore
+      - name: Build shell extension
+        run: msbuild AssemblyInformationShellExt/AssemblyInformation.vcxproj /p:Configuration=Release /p:Platform=x64
 
       - name: Create release zip
         run: |
-          Compress-Archive -Path publish\AssemblyInformation.exe -DestinationPath AssemblyInformation-${{ github.ref_name }}-win-x64.zip
+          $stagingDir = "staging"
+          New-Item -ItemType Directory -Path $stagingDir
+          Copy-Item publish\AssemblyInformation.exe $stagingDir\
+          Copy-Item AssemblyInformationShellExt\x64\Release\AssemblyInformation.dll $stagingDir\
+          Copy-Item install.cmd $stagingDir\
+          Copy-Item uninstall.cmd $stagingDir\
+          Compress-Archive -Path $stagingDir\* -DestinationPath AssemblyInformation-${{ github.ref_name }}-win-x64.zip
         shell: pwsh
 
       - name: Create GitHub Release

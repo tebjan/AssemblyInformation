@@ -20,7 +20,7 @@ namespace AssemblyInformation
                 + Environment.NewLine + Environment.NewLine
                 + "Developed by Tebjan Halm"
                 + Environment.NewLine
-                + "Originally created by Ashutosh Bhawasinka";
+                + "Originally created by Rotem Bloom & Ashutosh Bhawasinka";
 
             // Replace company label with clickable website link
             var websiteLink = new LinkLabel

@@ -143,7 +143,9 @@ namespace AssemblyInformation {
         
         /// <summary>
         ///   Looks up a localized string similar to .NET Assembly Information
-        ///Displays information on a .NET Assembly.  Developed by Rotem Bloom &amp; Ashutosh Bhawasinka.
+        ///Displays information on a .NET Assembly.  Developed by Tebjan Halm.
+        ///
+        ///Originally created by Rotem Bloom &amp; Ashutosh Bhawasinka.
         ///
         ///Usage:
         ///AssemblyInformation.exe &lt;assembly&gt;.

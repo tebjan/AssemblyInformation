@@ -146,7 +146,9 @@
   </data>
   <data name="UsageString" xml:space="preserve">
     <value>.NET Assembly Information
-Displays information on a .NET Assembly.  Developed by Rotem Bloom &amp; Ashutosh Bhawasinka.
+Displays information on a .NET Assembly.  Developed by Tebjan Halm.
+
+Originally created by Rotem Bloom &amp; Ashutosh Bhawasinka.
 
 Usage:
 AssemblyInformation.exe &lt;assembly&gt;</value>
