@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Windows.Forms;
 using AssemblyInformation.Model;
+using System.ComponentModel;
 
 namespace AssemblyInformation
 {
@@ -16,12 +17,16 @@ namespace AssemblyInformation
             messageLabel.Text = "";
         }
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public string TestAssemblyFullName { get; set; }
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public string DirectoryPath { get; set; }
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public bool Recursive { get; set; }
 
+        [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
         public IEnumerable<string> ReferringAssemblies { get; set; }
 
         private void FindReferringAssembliesForm_Load(object sender, EventArgs e)

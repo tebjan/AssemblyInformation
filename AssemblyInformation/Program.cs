@@ -12,6 +12,8 @@ namespace AssemblyInformation
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            Application.SetColorMode(SystemColorMode.Dark);
             Application.ThreadException += ApplicationThreadException;
 
             string assemblyFullPath = null;
