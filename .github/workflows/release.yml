@@ -15,29 +15,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup .NET 8
+      - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Restore dependencies
-        run: dotnet restore AssemblyInformation.sln
+          dotnet-version: 10.0.x
 
       - name: Publish single-file exe
         run: dotnet publish AssemblyInformation/AssemblyInformation.csproj -c Release -r win-x64 --no-self-contained -p:PublishSingleFile=true -o publish
-
-      - name: Build shell extension
-        run: msbuild AssemblyInformationShellExt/AssemblyInformation.vcxproj /p:Configuration=Release /p:Platform=x64
 
       - name: Create release zip
         run: |
           $stagingDir = "staging"
           New-Item -ItemType Directory -Path $stagingDir
           Copy-Item publish\AssemblyInformation.exe $stagingDir\
-          Copy-Item AssemblyInformationShellExt\bin\Release\AssemblyInformation.dll $stagingDir\
           Copy-Item install.cmd $stagingDir\
           Copy-Item uninstall.cmd $stagingDir\
           Compress-Archive -Path $stagingDir\* -DestinationPath AssemblyInformation-${{ github.ref_name }}-win-x64.zip
@@ -50,7 +40,7 @@ jobs:
           body: |
             **[Download AssemblyInformation-${{ github.ref_name }}-win-x64.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/AssemblyInformation-${{ github.ref_name }}-win-x64.zip)**
 
-            **Requires:** [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) or newer
+            **Requires:** [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) or newer
 
             ### Installation
             1. Download and extract the zip

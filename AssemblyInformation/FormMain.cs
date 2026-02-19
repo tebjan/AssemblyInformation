@@ -30,6 +30,7 @@ namespace AssemblyInformation
         {
             InitializeComponent();
             FormClosing += FormMainFormClosing;
+            UpdateThemeCheckmarks();
 
             dropHintLabel = new Label
             {
@@ -59,13 +60,22 @@ namespace AssemblyInformation
             versionInfoListView.Items.Clear();
 
             _assemblyPath = assemblyPath;
-            assemblyInformation = new AssemblyInformationLoader(assemblyPath);
-
-            // If this is a .NET apphost exe, automatically load the companion managed dll
-            if (assemblyInformation.ApphostManagedDll != null)
+            try
             {
-                _assemblyPath = assemblyInformation.ApphostManagedDll;
-                assemblyInformation = new AssemblyInformationLoader(_assemblyPath);
+                assemblyInformation = new AssemblyInformationLoader(assemblyPath);
+
+                // If this is a .NET apphost exe, automatically load the companion managed dll
+                if (assemblyInformation.ApphostManagedDll != null)
+                {
+                    _assemblyPath = assemblyInformation.ApphostManagedDll;
+                    assemblyInformation = new AssemblyInformationLoader(_assemblyPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading assembly: {ex.Message}", Resource.AppName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
             }
 
             referringAssemblyFolderTextBox.Text = Path.GetDirectoryName(_assemblyPath);
@@ -269,8 +279,9 @@ namespace AssemblyInformation
                         Trace.WriteLine(String.Format("{0} is already a parent of {1}", assemblyName, treeNode.Name));
                     }
                 }
-                if (AssemblyInformationLoader.SystemAssemblies.Where(p => assemblyName.StartsWith(p)).Count() == 0)
+                if (!binary.IsSystemBinary)
                 {
+                    // Add dummy child to show expand icon; resolved lazily on expand
                     node.Nodes.Add(new TreeNode(Loading));
                 }
             }
@@ -363,13 +374,14 @@ namespace AssemblyInformation
                     return;
                 }
 
-                // For lazy loading sub-dependencies, resolve and inspect from the same directory
-                var searchDir = Path.GetDirectoryName(_assemblyPath);
+                // Resolve the assembly path using the full NuGet-aware resolver
+                var resolvedPath = ResolveReferencePath(binary);
                 DependencyWalker dependencyWalker = new DependencyWalker();
-                var referredAssemblies = dependencyWalker.FindDependencies(
-                    new AssemblyName(binary.FullName), searchDir, false, out _);
-
-                FillAssemblyReferences(referredAssemblies, e.Node);
+                if (resolvedPath != null)
+                {
+                    var referredAssemblies = dependencyWalker.FindDependencies(resolvedPath, false, out _);
+                    FillAssemblyReferences(referredAssemblies, e.Node);
+                }
             }
         }
 
@@ -547,6 +559,52 @@ namespace AssemblyInformation
                 var files = (string[])e.Data.GetData(DataFormats.FileDrop);
                 if (files.Length == 1)
                     LoadAssembly(files[0]);
+            }
+        }
+
+        private string ResolveReferencePath(Binary binary)
+        {
+            if (binary.FullPath != null && File.Exists(binary.FullPath))
+                return binary.FullPath;
+
+            // Use MetadataLoadContext with the NuGet-aware resolver to find the assembly
+            try
+            {
+                var resolver = AssemblyInformationLoader.CreateAssemblyResolver(_assemblyPath);
+                using var mlc = new System.Reflection.MetadataLoadContext(resolver);
+                var asm = mlc.LoadFromAssemblyName(new AssemblyName(binary.FullName));
+                if (!string.IsNullOrEmpty(asm.Location) && File.Exists(asm.Location))
+                    return asm.Location;
+            }
+            catch { }
+
+            // Fallback: check local directory
+            var searchDir = Path.GetDirectoryName(_assemblyPath);
+            var name = new AssemblyName(binary.FullName).Name;
+            var dllPath = Path.Combine(searchDir, name + ".dll");
+            if (File.Exists(dllPath)) return dllPath;
+            var exePath = Path.Combine(searchDir, name + ".exe");
+            if (File.Exists(exePath)) return exePath;
+
+            return null;
+        }
+
+        private void UpdateThemeCheckmarks()
+        {
+            var current = ThemeSettings.Load();
+            themeSystemToolStripMenuItem.Checked = current == SystemColorMode.System;
+            themeLightToolStripMenuItem.Checked = current == SystemColorMode.Classic;
+            themeDarkToolStripMenuItem.Checked = current == SystemColorMode.Dark;
+        }
+
+        private void themeToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (sender is ToolStripMenuItem item && item.Tag is SystemColorMode mode)
+            {
+                ThemeSettings.Save(mode);
+                UpdateThemeCheckmarks();
+                MessageBox.Show("Theme will change on next launch.", Resource.AppName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
     }

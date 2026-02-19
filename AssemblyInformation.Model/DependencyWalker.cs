@@ -157,6 +157,17 @@ namespace AssemblyInformation.Model
 
                 // Try to resolve and recurse
                 var resolvedPath = ResolveAssemblyPath(referencedAssembly, searchDirectory);
+                if (resolvedPath == null)
+                {
+                    // Try via MetadataLoadContext resolver (includes NuGet paths)
+                    try
+                    {
+                        var refAsm = mlc.LoadFromAssemblyName(referencedAssembly);
+                        if (!string.IsNullOrEmpty(refAsm.Location))
+                            resolvedPath = refAsm.Location;
+                    }
+                    catch { }
+                }
                 if (resolvedPath != null)
                 {
                     assemblyMap[name] = new Binary(referencedAssembly, resolvedPath);

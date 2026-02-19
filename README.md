@@ -15,11 +15,21 @@ Displays .NET Assembly information like:
 
 ![ui](https://raw.githubusercontent.com/tebjan/AssemblyInformation/master/images/ui.png)
 
-Works with assemblies from all .NET versions: .NET Framework, .NET Core, .NET 5/6/7/8+, and .NET Standard.
+Works with assemblies from all .NET versions: .NET Framework, .NET Core, .NET 5+, and .NET Standard. Also shows Win32 version info for native PE files.
+
+Supports dark mode (configurable via View > Theme menu).
+
+## Installation
+
+Download the latest release from [GitHub Releases](https://github.com/tebjan/AssemblyInformation/releases) and run `install.cmd` as Administrator. This registers the Explorer context menu for .dll and .exe files.
+
+Requires [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) or newer.
+
+To uninstall, run `uninstall.cmd` as Administrator.
 
 ## Building
 
-Requires .NET 8 SDK.
+Requires .NET 10 SDK.
 
 ```bash
 dotnet build AssemblyInformation.sln -c Release
@@ -31,7 +41,9 @@ dotnet build AssemblyInformation.sln -c Release
 AssemblyInformation.exe <path-to-assembly.dll>
 ```
 
-Or right-click a .dll/.exe in Windows Explorer and select "Assembly Information" (requires shell extension registration).
+Or right-click a .dll/.exe in Windows Explorer and select "Assembly Information" (requires installation, see above).
+
+You can also drag and drop files onto the application window, or use Options > Open Assembly (Ctrl+O).
 
 ## License
 

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using NuGet.Configuration;
 
 namespace AssemblyInformation.Model
 {
@@ -82,10 +83,17 @@ namespace AssemblyInformation.Model
         {
             if (!IsManaged) return Array.Empty<AssemblyName>();
 
-            var resolver = CreateAssemblyResolver(FilePath);
-            using var mlc = new MetadataLoadContext(resolver);
-            var assembly = mlc.LoadFromAssemblyPath(FilePath);
-            return assembly.GetReferencedAssemblies();
+            try
+            {
+                var resolver = CreateAssemblyResolver(FilePath);
+                using var mlc = new MetadataLoadContext(resolver);
+                var assembly = mlc.LoadFromAssemblyPath(FilePath);
+                return assembly.GetReferencedAssemblies();
+            }
+            catch (Exception)
+            {
+                return Array.Empty<AssemblyName>();
+            }
         }
 
         private void LoadInformation()
@@ -231,8 +239,17 @@ namespace AssemblyInformation.Model
             AssemblyFullName = assembly.FullName;
             FrameworkVersion = assembly.ImageRuntimeVersion;
 
-            DetermineDebuggingAttributes(assembly);
-            DetermineFrameworkVersion(assembly);
+            try
+            {
+                DetermineDebuggingAttributes(assembly);
+                DetermineFrameworkVersion(assembly);
+            }
+            catch (Exception)
+            {
+                // Some assemblies reference types that can't be resolved
+                // (e.g. NuGet packages with dependencies in other directories).
+                // Show what we have rather than crashing.
+            }
         }
 
         private void DetermineDebuggingAttributes(Assembly assembly)
@@ -348,7 +365,7 @@ namespace AssemblyInformation.Model
             }
         }
 
-        internal static PathAssemblyResolver CreateAssemblyResolver(string assemblyPath)
+        public static PathAssemblyResolver CreateAssemblyResolver(string assemblyPath)
         {
             var assemblyDir = Path.GetDirectoryName(assemblyPath);
 
@@ -379,7 +396,10 @@ namespace AssemblyInformation.Model
                     AddFile(file);
             }
 
-            // 3. .NET Framework reference assemblies (for inspecting Framework assemblies)
+            // 3. NuGet package caches — scan sibling packages and global cache
+            AddNuGetPackageAssemblies(assemblyDir, AddFile);
+
+            // 4. .NET Framework reference assemblies (for inspecting Framework assemblies)
             var frameworkRefBase = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
                 "Reference Assemblies", "Microsoft", "Framework", ".NETFramework");
@@ -408,6 +428,147 @@ namespace AssemblyInformation.Model
             pathsByName[Path.GetFileName(assemblyPath)] = assemblyPath;
 
             return new PathAssemblyResolver(pathsByName.Values);
+        }
+
+        /// <summary>
+        /// Scans NuGet package directories to resolve assembly dependencies.
+        /// Checks: sibling packages when inside a NuGet-like directory, and all NuGet global/fallback folders.
+        /// </summary>
+        private static void AddNuGetPackageAssemblies(string assemblyDir, Action<string> addFile)
+        {
+            if (string.IsNullOrEmpty(assemblyDir)) return;
+
+            // Detect if the assembly is inside a NuGet package layout:
+            // .../packages/PackageName.Version/lib/tfm/Assembly.dll
+            var tfmDir = assemblyDir;
+            var libDir = Path.GetDirectoryName(tfmDir);
+            if (libDir != null && Path.GetFileName(libDir).Equals("lib", StringComparison.OrdinalIgnoreCase))
+            {
+                var packageDir = Path.GetDirectoryName(libDir);
+                var packagesRoot = packageDir != null ? Path.GetDirectoryName(packageDir) : null;
+                if (packagesRoot != null)
+                {
+                    var tfmName = Path.GetFileName(tfmDir);
+                    ScanNuGetRoot(packagesRoot, tfmName, addFile);
+                }
+            }
+
+            // Use official NuGet API to find all package folders
+            var tfmHint = Path.GetFileName(tfmDir);
+            try
+            {
+                var settings = Settings.LoadDefaultSettings(assemblyDir);
+                var globalFolder = SettingsUtility.GetGlobalPackagesFolder(settings);
+                if (Directory.Exists(globalFolder))
+                    ScanNuGetGlobalCache(globalFolder, tfmHint, addFile);
+
+                foreach (var fallback in SettingsUtility.GetFallbackPackageFolders(settings))
+                {
+                    if (Directory.Exists(fallback))
+                        ScanNuGetRoot(fallback, tfmHint, addFile);
+                }
+            }
+            catch
+            {
+                // NuGet configuration might not be available — best effort
+            }
+        }
+
+        /// <summary>
+        /// Scans the global NuGet cache which has a two-level structure: package-name/version/lib/tfm/.
+        /// </summary>
+        private static void ScanNuGetGlobalCache(string globalCache, string preferredTfm, Action<string> addFile)
+        {
+            if (!Directory.Exists(globalCache)) return;
+
+            var tfmBase = preferredTfm;
+            var dashIdx = preferredTfm.IndexOf('-');
+            if (dashIdx > 0) tfmBase = preferredTfm.Substring(0, dashIdx);
+
+            try
+            {
+                foreach (var packageNameDir in Directory.GetDirectories(globalCache))
+                {
+                    // Pick the latest version directory
+                    var versionDirs = Directory.GetDirectories(packageNameDir);
+                    if (versionDirs.Length == 0) continue;
+                    var latestVersion = versionDirs.OrderByDescending(d => Path.GetFileName(d)).First();
+
+                    var libDir = Path.Combine(latestVersion, "lib");
+                    if (!Directory.Exists(libDir)) continue;
+
+                    var tfmDir = FindBestTfmDirectory(libDir, preferredTfm, tfmBase);
+                    if (tfmDir != null)
+                    {
+                        foreach (var file in Directory.GetFiles(tfmDir, "*.dll"))
+                            addFile(file);
+                    }
+                }
+            }
+            catch
+            {
+                // Best effort
+            }
+        }
+
+        private static void ScanNuGetRoot(string packagesRoot, string preferredTfm, Action<string> addFile)
+        {
+            if (!Directory.Exists(packagesRoot)) return;
+
+            // Extract the base TFM prefix for matching (e.g. "net8.0-windows7.0" -> "net8.0")
+            var tfmBase = preferredTfm;
+            var dashIdx = preferredTfm.IndexOf('-');
+            if (dashIdx > 0) tfmBase = preferredTfm.Substring(0, dashIdx);
+
+            try
+            {
+                foreach (var packageDir in Directory.GetDirectories(packagesRoot))
+                {
+                    var libDir = Path.Combine(packageDir, "lib");
+                    if (!Directory.Exists(libDir)) continue;
+
+                    // Try to find the best matching TFM directory
+                    var tfmDir = FindBestTfmDirectory(libDir, preferredTfm, tfmBase);
+                    if (tfmDir != null)
+                    {
+                        foreach (var file in Directory.GetFiles(tfmDir, "*.dll"))
+                            addFile(file);
+                    }
+                }
+            }
+            catch
+            {
+                // Access errors, etc. — best effort
+            }
+        }
+
+        private static string FindBestTfmDirectory(string libDir, string preferredTfm, string tfmBase)
+        {
+            string[] tfmDirs;
+            try { tfmDirs = Directory.GetDirectories(libDir); }
+            catch { return null; }
+
+            // Priority: exact match > base prefix match > netstandard (highest version)
+            string exactMatch = null, prefixMatch = null, netstandardMatch = null;
+            foreach (var dir in tfmDirs)
+            {
+                var name = Path.GetFileName(dir);
+                if (name.Equals(preferredTfm, StringComparison.OrdinalIgnoreCase))
+                {
+                    exactMatch = dir;
+                    break;
+                }
+                if (prefixMatch == null && name.StartsWith(tfmBase, StringComparison.OrdinalIgnoreCase))
+                    prefixMatch = dir;
+                if (name.StartsWith("netstandard", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (netstandardMatch == null ||
+                        string.Compare(name, Path.GetFileName(netstandardMatch), StringComparison.OrdinalIgnoreCase) > 0)
+                        netstandardMatch = dir;
+                }
+            }
+
+            return exactMatch ?? prefixMatch ?? netstandardMatch;
         }
     }
 }

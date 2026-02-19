@@ -14,28 +14,21 @@ set "INSTALL_DIR=%ProgramFiles%\AssemblyInformation"
 
 echo Installing .NET Assembly Information to %INSTALL_DIR% ...
 
-:: If upgrading, unregister old shell extension and restart Explorer to release it
-if exist "%INSTALL_DIR%\AssemblyInformation.dll" (
-    regsvr32 /u /s "%INSTALL_DIR%\AssemblyInformation.dll"
-    taskkill /f /im explorer.exe >nul 2>&1
-    timeout /t 1 /nobreak >nul
-    start explorer.exe
-)
-
 :: Create install directory
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
 :: Copy files
 copy /y "%~dp0AssemblyInformation.exe" "%INSTALL_DIR%\" >nul
-copy /y "%~dp0AssemblyInformation.dll" "%INSTALL_DIR%\" >nul
 
-:: Register shell extension
-regsvr32 /s "%INSTALL_DIR%\AssemblyInformation.dll"
-if %errorlevel% neq 0 (
-    echo Failed to register shell extension.
-    pause
-    exit /b 1
-)
+:: Register context menu for .dll files
+reg add "HKCR\dllfile\shell\AssemblyInformation" /ve /d "Assembly Information" /f >nul
+reg add "HKCR\dllfile\shell\AssemblyInformation" /v "Icon" /d "\"%INSTALL_DIR%\AssemblyInformation.exe\"" /f >nul
+reg add "HKCR\dllfile\shell\AssemblyInformation\command" /ve /d "\"%INSTALL_DIR%\AssemblyInformation.exe\" \"%%1\"" /f >nul
+
+:: Register context menu for .exe files
+reg add "HKCR\exefile\shell\AssemblyInformation" /ve /d "Assembly Information" /f >nul
+reg add "HKCR\exefile\shell\AssemblyInformation" /v "Icon" /d "\"%INSTALL_DIR%\AssemblyInformation.exe\"" /f >nul
+reg add "HKCR\exefile\shell\AssemblyInformation\command" /ve /d "\"%INSTALL_DIR%\AssemblyInformation.exe\" \"%%1\"" /f >nul
 
 echo.
 echo Installation complete.

@@ -13,7 +13,7 @@ namespace AssemblyInformation
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            Application.SetColorMode(SystemColorMode.Dark);
+            Application.SetColorMode(ThemeSettings.Load());
             Application.ThreadException += ApplicationThreadException;
 
             string assemblyFullPath = null;

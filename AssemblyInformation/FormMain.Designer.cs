@@ -129,6 +129,7 @@
             // 
             // frameWorkVersion
             // 
+            frameWorkVersion.BackColor = System.Drawing.SystemColors.Control;
             frameWorkVersion.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             frameWorkVersion.Location = new System.Drawing.Point(692, 39);
             frameWorkVersion.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
@@ -319,6 +320,7 @@
             // targetProcessorTextBox
             // 
             targetProcessorTextBox.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            targetProcessorTextBox.BackColor = System.Drawing.SystemColors.Control;
             targetProcessorTextBox.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             targetProcessorTextBox.Location = new System.Drawing.Point(153, 121);
             targetProcessorTextBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
@@ -330,6 +332,7 @@
             // assemblyKindTextBox
             // 
             assemblyKindTextBox.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            assemblyKindTextBox.BackColor = System.Drawing.SystemColors.Control;
             assemblyKindTextBox.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             assemblyKindTextBox.Location = new System.Drawing.Point(153, 73);
             assemblyKindTextBox.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
@@ -424,6 +427,7 @@
             // txtFullName
             // 
             txtFullName.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left | System.Windows.Forms.AnchorStyles.Right;
+            txtFullName.BackColor = System.Drawing.SystemColors.Control;
             txtFullName.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             txtFullName.Location = new System.Drawing.Point(153, 148);
             txtFullName.Margin = new System.Windows.Forms.Padding(4, 3, 4, 3);
@@ -492,7 +496,12 @@
             // 
             // viewToolStripMenuItem
             // 
-            viewToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { hideGACAssembliesToolStripMenuItem, showAssemblyFullNameToolStripMenuItem });
+            themeToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            themeSystemToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            themeLightToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            themeDarkToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
+            viewToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { hideGACAssembliesToolStripMenuItem, showAssemblyFullNameToolStripMenuItem, toolStripSeparator2, themeToolStripMenuItem });
             viewToolStripMenuItem.Name = "viewToolStripMenuItem";
             viewToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
             viewToolStripMenuItem.Text = "View";
@@ -512,7 +521,43 @@
             showAssemblyFullNameToolStripMenuItem.Size = new System.Drawing.Size(214, 22);
             showAssemblyFullNameToolStripMenuItem.Text = "Show Assembly Full Name";
             showAssemblyFullNameToolStripMenuItem.Click += showAssemblyFullNameToolStripMenuItem_Click;
-            // 
+            //
+            // toolStripSeparator2
+            //
+            toolStripSeparator2.Name = "toolStripSeparator2";
+            toolStripSeparator2.Size = new System.Drawing.Size(211, 6);
+            //
+            // themeToolStripMenuItem
+            //
+            themeToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] { themeSystemToolStripMenuItem, themeLightToolStripMenuItem, themeDarkToolStripMenuItem });
+            themeToolStripMenuItem.Name = "themeToolStripMenuItem";
+            themeToolStripMenuItem.Size = new System.Drawing.Size(214, 22);
+            themeToolStripMenuItem.Text = "Theme";
+            //
+            // themeSystemToolStripMenuItem
+            //
+            themeSystemToolStripMenuItem.Name = "themeSystemToolStripMenuItem";
+            themeSystemToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            themeSystemToolStripMenuItem.Text = "System Default";
+            themeSystemToolStripMenuItem.Click += themeToolStripMenuItem_Click;
+            themeSystemToolStripMenuItem.Tag = System.Windows.Forms.SystemColorMode.System;
+            //
+            // themeLightToolStripMenuItem
+            //
+            themeLightToolStripMenuItem.Name = "themeLightToolStripMenuItem";
+            themeLightToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            themeLightToolStripMenuItem.Text = "Light";
+            themeLightToolStripMenuItem.Click += themeToolStripMenuItem_Click;
+            themeLightToolStripMenuItem.Tag = System.Windows.Forms.SystemColorMode.Classic;
+            //
+            // themeDarkToolStripMenuItem
+            //
+            themeDarkToolStripMenuItem.Name = "themeDarkToolStripMenuItem";
+            themeDarkToolStripMenuItem.Size = new System.Drawing.Size(160, 22);
+            themeDarkToolStripMenuItem.Text = "Dark";
+            themeDarkToolStripMenuItem.Click += themeToolStripMenuItem_Click;
+            themeDarkToolStripMenuItem.Tag = System.Windows.Forms.SystemColorMode.Dark;
+            //
             // FormMain
             // 
             AllowDrop = true;
@@ -587,5 +632,10 @@
         private System.Windows.Forms.ListView versionInfoListView;
         private System.Windows.Forms.ColumnHeader columnHeaderProperty;
         private System.Windows.Forms.ColumnHeader columnHeaderValue;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
+        private System.Windows.Forms.ToolStripMenuItem themeToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem themeSystemToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem themeLightToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem themeDarkToolStripMenuItem;
     }
 }

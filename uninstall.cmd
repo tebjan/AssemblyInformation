@@ -14,20 +14,12 @@ set "INSTALL_DIR=%ProgramFiles%\AssemblyInformation"
 
 echo Uninstalling .NET Assembly Information ...
 
-:: Unregister shell extension
-if exist "%INSTALL_DIR%\AssemblyInformation.dll" (
-    regsvr32 /u /s "%INSTALL_DIR%\AssemblyInformation.dll"
-)
-
-:: Restart Explorer to release the loaded DLL
-echo Restarting Explorer ...
-taskkill /f /im explorer.exe >nul 2>&1
-timeout /t 1 /nobreak >nul
-start explorer.exe
+:: Remove context menu registry entries
+reg delete "HKCR\dllfile\shell\AssemblyInformation" /f >nul 2>&1
+reg delete "HKCR\exefile\shell\AssemblyInformation" /f >nul 2>&1
 
 :: Remove files
 if exist "%INSTALL_DIR%\AssemblyInformation.exe" del /f /q "%INSTALL_DIR%\AssemblyInformation.exe"
-if exist "%INSTALL_DIR%\AssemblyInformation.dll" del /f /q "%INSTALL_DIR%\AssemblyInformation.dll"
 if exist "%INSTALL_DIR%" rmdir /q "%INSTALL_DIR%" 2>nul
 
 echo.
