@@ -28,7 +28,8 @@ namespace AssemblyInformation
                 Text = "https://tebjan.de",
                 Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(3, 0, 0, 0)
+                Padding = new Padding(3, 0, 0, 0),
+                LinkColor = Color.CornflowerBlue
             };
             websiteLink.LinkClicked += (s, e) =>
             {
