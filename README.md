@@ -1,7 +1,5 @@
 # .NET Assembly Information
 
-[![Build](https://github.com/tebjan/AssemblyInformation/actions/workflows/build.yml/badge.svg)](https://github.com/tebjan/AssemblyInformation/actions/workflows/build.yml)
-
 Windows Explorer extension that adds the entry "Assembly Information" to the context menu of .NET assemblies:
 
 ![context menu](https://raw.githubusercontent.com/tebjan/AssemblyInformation/master/images/context_menu.png)
